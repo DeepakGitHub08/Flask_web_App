@@ -1,8 +1,7 @@
-from flask import Blueprint, render_template, request, flash,redirect, url_for
+from flask import Blueprint, render_template, request, flash,redirect, url_for,session
 from werkzeug.security import generate_password_hash, check_password_hash
 import MySQLdb.cursors
 from . import mysql
-from flask_login import login_user, login_required, logout_user, current_user
 
 auths = Blueprint('auths', __name__);
 
@@ -12,23 +11,32 @@ def login():
         email  = request.form.get('email')
         password = request.form.get('password')
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('SELECT * FROM user WHERE email = % s AND password = % s', (email, password, ))
+        cursor.execute('SELECT * FROM user WHERE email = % s AND password = % s', (email, password ))
         user = cursor.fetchone()
         if user:
+            session['loggedin'] = True
+            session['id'] = user['id']
+            session['username'] = user['first_name']
             if user['password'] == password:
-                login_user(user, remember=True)
+                print(user)
+                cursor.execute('SELECT * FROM notes WHERE user_id = %(user_id)s ',{'user_id': user['id'] })
+                notes = cursor.fetchall()
+                session['notes'] = notes
+                print(notes)
                 return redirect(url_for('views.home'))
             else :
                 flash('Password or email is not correct', category='error')
         else:
             flash('User does not  exist', category='error')
-    return render_template('login.html', user = current_user)    
+    return render_template('login.html')    
 
 @auths.route('/logout')
-@login_required
 def logout():
-        logout_user()
-        return redirect(url_for('auths.login'))
+    session.pop('loggedin', None)
+    session.pop('id', None)
+    session.pop('first_name', None)
+    session.pop('notes',None )
+    return redirect(url_for('auths.login'))
 
 @auths.route('/signup',  methods = ['GET', 'POST'])
 def signup():
@@ -58,6 +66,6 @@ def signup():
                 flash('Account created!', category='success')
                 return redirect(url_for('views.home'))
 
-    return render_template("signup.html", user = current_user)
+    return render_template("signup.html")
 
 

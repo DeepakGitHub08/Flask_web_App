@@ -1,7 +1,6 @@
 from flask import Flask 
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
-from flask_login import LoginManager, login_manager
 from os import path
 
 mysql = MySQL()
@@ -18,17 +17,6 @@ def create_app():
      from .views import views
      from .auths import auths
 
-
-     login_manager = LoginManager()
-     login_manager.login_view  = 'auths.login'
-     login_manager.init_app(app)
-
-     @login_manager.user_loader
-     def load_user(id):
-          cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-          cursor.execute('SELECT * FROM user WHERE id = %s', (id))
-          user = cursor.fetchone()
-          return user
 
      app.register_blueprint(views, url_prefix = "/");
      app.register_blueprint(auths, url_prefix = "/");

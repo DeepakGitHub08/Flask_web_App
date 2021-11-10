@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, request, flash, jsonify
-from flask_login import login_required, current_user
+from flask import Blueprint, render_template, request, flash, jsonify,session
 from . import mysql
 import MySQLdb.cursors
 import json
@@ -7,7 +6,6 @@ import json
 views = Blueprint('views', __name__);
 
 @views.route('/', methods = ['GET','POST'])
-@login_required
 def home():
     if request.method == 'POST':
         note = request.form.get('note')
@@ -15,21 +13,31 @@ def home():
             flash('Note is too short!', category='error')
         else:
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-            cursor.execute('INSERT INTO notes(data, user_id) VALUES (% s, %s)', ( note, current_user.id))
+            cursor.execute('INSERT INTO notes(data, user_id) VALUES (% s, %s)', ( note, session['id']))
             mysql.connection.commit()
+            cursor.execute('SELECT * FROM notes WHERE user_id = %(user_id)s ',{'user_id': session['id'] })
+            notes = cursor.fetchall()
+            session.pop('notes', None)
+            session['notes'] = notes
             flash('Note added!', category='success')
    
 
-    return render_template("home.html", user= current_user)
+    return render_template("home.html" )
 
-# @views.route('/delete-note', methods=['POST'])
-# def delete_note():
-#     note = json.loads(request.data)
-#     noteId = note['noteId']
-#     note = Notes.query.get(noteId)
-#     if note:
-#         if note.user_id == current_user.id:
-#             db.session.delete(note)
-#             db.session.commit()
-
-#     return jsonify({})
+@views.route('/delete-note', methods=['POST'])
+def delete_note():
+    note = json.loads(request.data)
+    noteId = note['noteId']
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cursor.execute('select * from notes where id = %s',(noteId,))
+    note = cursor.fetchone()
+    print(note)
+    if note:
+        if note['user_id'] == session['id']:
+            cursor.execute('delete from notes where id = %s', (note['id'],) )
+            mysql.connection.commit()
+            cursor.execute('SELECT * FROM notes WHERE user_id = %(user_id)s ',{'user_id': session['id'] })
+            notes = cursor.fetchall()
+            session.pop('notes', None)
+            session['notes'] = notes
+    return jsonify({})
